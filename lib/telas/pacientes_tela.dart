@@ -40,7 +40,7 @@ class _PacientesViewState extends State<PacientesView> {
     if (!mounted) return;
     setState(() {
       _isLoading = true;
-      _pacientes = [];
+      _pacientes = []; // Reinicializa a lista antes da busca
       _pacientesFiltrados = [];
     });
     try {
@@ -55,6 +55,7 @@ class _PacientesViewState extends State<PacientesView> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao carregar pacientes: $e'), backgroundColor: Colors.red));
       }
+      // Garante que as listas permaneçam vazias em caso de erro
       if (!mounted) return;
       setState(() {
         _pacientes = [];
@@ -72,6 +73,7 @@ class _PacientesViewState extends State<PacientesView> {
   void _filtrarPacientes() {
     final termoBusca = _searchController.text.toLowerCase();
     setState(() {
+      // Usa um null-aware operator para garantir que a lista _pacientes não seja nula
       _pacientesFiltrados = _pacientes.where((paciente) {
         return paciente.nomeCompleto.toLowerCase().contains(termoBusca) ||
                paciente.cpf.toLowerCase().contains(termoBusca);
@@ -157,106 +159,102 @@ class _PacientesViewState extends State<PacientesView> {
 
   @override
   Widget build(BuildContext context) {
-    // Adicionamos o Scaffold com a cor de fundo branca
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Pacientes', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
-                    const Text('Gerencie todos os pacientes cadastrados', style: TextStyle(color: Colors.grey)),
-                  ],
-                ),
-                ElevatedButton.icon(
-                  onPressed: () => _abrirFormularioPaciente(),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Novo Paciente'),
-                  style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Buscar por nome ou CPF...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-                filled: true,
-                fillColor: Colors.grey[200],
+    return Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Pacientes', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  const Text('Gerencie todos os pacientes cadastrados', style: TextStyle(color: Colors.grey)),
+                ],
               ),
+              ElevatedButton.icon(
+                onPressed: () => _abrirFormularioPaciente(),
+                icon: const Icon(Icons.add),
+                label: const Text('Novo Paciente'),
+                style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Buscar por nome ou CPF...',
+              prefixIcon: const Icon(Icons.search),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              filled: true,
+              fillColor: Colors.grey[200],
             ),
-            const SizedBox(height: 24),
-            _isLoading
-                ? const Expanded(child: Center(child: CircularProgressIndicator()))
-                : Expanded(
-                    child: _pacientesFiltrados.isEmpty && _searchController.text.isNotEmpty
-                        ? const Center(child: Text('Nenhum resultado encontrado.'))
-                        : _pacientesFiltrados.isEmpty && _searchController.text.isEmpty
-                            ? const Center(child: Text('Nenhum paciente encontrado.'))
-                            : GridView.builder(
-                                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 400, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.5),
-                                itemCount: _pacientesFiltrados.length,
-                                itemBuilder: (context, index) {
-                                  final paciente = _pacientesFiltrados[index];
-                                  return _buildPatientCard(paciente);
-                                },
-                              ),
-                  ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 24),
+          _isLoading
+              ? const Expanded(child: Center(child: CircularProgressIndicator()))
+              : Expanded(
+                  child: _pacientesFiltrados.isEmpty && _searchController.text.isNotEmpty
+                      ? const Center(child: Text('Nenhum resultado encontrado.'))
+                      : _pacientesFiltrados.isEmpty && _searchController.text.isEmpty
+                          ? const Center(child: Text('Nenhum paciente encontrado.'))
+                          : GridView.builder(
+                              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 400, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.5),
+                              itemCount: _pacientesFiltrados.length,
+                              itemBuilder: (context, index) {
+                                final paciente = _pacientesFiltrados[index];
+                                return _buildPatientCard(paciente);
+                              },
+                            ),
+                ),
+        ],
       ),
     );
   }
 
-  Widget _buildPatientCard(Paciente paciente) {
-    final initials = paciente.nomeCompleto.isNotEmpty ? paciente.nomeCompleto.split(' ').map((e) => e[0]).take(2).join().toUpperCase() : '?';
-    return Card(
-      color: Colors.white,
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      child: InkWell(
-        onTap: () => _mostrarDetalhes(paciente),
-        borderRadius: BorderRadius.circular(10),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(children: [CircleAvatar(child: Text(initials)), const SizedBox(width: 12), Expanded(child: Text(paciente.nomeCompleto, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)))]),
-              const Divider(height: 24),
-              _buildInfoRow(Icons.badge_outlined, paciente.cpf),
-              const SizedBox(height: 8),
-              _buildInfoRow(Icons.calendar_today_outlined, paciente.dataNascimento),
-              const SizedBox(height: 8),
-              _buildInfoRow(Icons.location_on_outlined, paciente.endereco.isNotEmpty ? paciente.endereco : 'Não informado'),
-              const Spacer(),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  OutlinedButton.icon(onPressed: () => _mostrarDetalhes(paciente), icon: const Icon(Icons.visibility_outlined, size: 16), label: const Text('Ver')),
-                  const SizedBox(width: 8),
-                  OutlinedButton.icon(onPressed: () => _abrirFormularioPaciente(paciente: paciente), icon: const Icon(Icons.edit_outlined, size: 16), label: const Text('Editar')),
-                ],
-              )
-            ],
-          ),
+Widget _buildPatientCard(Paciente paciente) {
+  final initials = paciente.nomeCompleto.isNotEmpty ? paciente.nomeCompleto.split(' ').map((e) => e[0]).take(2).join().toUpperCase() : '?';
+  return Card(
+    color: Colors.white, // <--- ALTERAÇÃO AQUI
+    elevation: 2,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    child: InkWell(
+      onTap: () => _mostrarDetalhes(paciente),
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [CircleAvatar(child: Text(initials)), const SizedBox(width: 12), Expanded(child: Text(paciente.nomeCompleto, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)))]),
+            const Divider(height: 24),
+            _buildInfoRow(Icons.badge_outlined, paciente.cpf),
+            const SizedBox(height: 8),
+            _buildInfoRow(Icons.calendar_today_outlined, paciente.dataNascimento),
+            const SizedBox(height: 8),
+            _buildInfoRow(Icons.location_on_outlined, paciente.endereco.isNotEmpty ? paciente.endereco : 'Não informado'),
+            const Spacer(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                OutlinedButton.icon(onPressed: () => _mostrarDetalhes(paciente), icon: const Icon(Icons.visibility_outlined, size: 16), label: const Text('Ver')),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(onPressed: () => _abrirFormularioPaciente(paciente: paciente), icon: const Icon(Icons.edit_outlined, size: 16), label: const Text('Editar')),
+              ],
+            )
+          ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildInfoRow(IconData icon, String text) {
     return Row(children: [
