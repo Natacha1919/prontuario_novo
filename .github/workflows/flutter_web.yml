@@ -8,17 +8,13 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pages: write
-      id-token: write
 
     steps:
       - uses: actions/checkout@v2
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.x' # Use a versão do seu Flutter, ex: '3.16.0'
+          flutter-version: '3.x'
           channel: 'stable'
 
       - run: flutter pub get
@@ -26,7 +22,7 @@ jobs:
       - run: flutter build web --release --base-href="/prontuario_novo/"
 
       - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+        uses: peaceiris/actions-gh-pages@v3
         with:
-          artifact_path: 'build/web'
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: build/web
