@@ -15,7 +15,7 @@ import 'package:prontuario_medico/telas/paciente_form_tela.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:prontuario_medico/servicos/gerador_pdf.dart';
-import 'package:prontuario_medico/telas/tela_principal.dart' as tela_principal; // Importa a cor primária
+import 'package:prontuario_medico/telas/tela_principal.dart' as tela_principal;
 
 final supabase = Supabase.instance.client;
 
@@ -31,8 +31,19 @@ class _PacienteDetalhesTelaState extends State<PacienteDetalhesTela> {
   int _selectedIndex = 0;
   final List<String> _tabs = ['Anamneses', 'Solicitar Exames', 'Anexos', 'Resultados'];
   bool _isUploading = false;
-  
   bool _isDownloading = false;
+
+  // Variáveis de estado para a tela de Solicitar Exames
+  final _formKey = GlobalKey<FormState>();
+  final _justificativaController = TextEditingController();
+  final Map<int, bool> _selecionados = {};
+  bool _isSaving = false;
+
+  @override
+  void dispose() {
+    _justificativaController.dispose();
+    super.dispose();
+  }
 
   Future<List<Anamnese>> _buscarAnamneses() async {
     final data = await supabase.from('anamneses').select().eq('paciente_id', widget.paciente.id!).order('created_at', ascending: false);
@@ -55,13 +66,17 @@ class _PacienteDetalhesTelaState extends State<PacienteDetalhesTela> {
   }
   
   void _abrirFormularioAnamnese({Anamnese? anamnese}) async {
-    final resultado = await Navigator.push<Anamnese>(context, MaterialPageRoute(builder: (context) => AnamneseFormTela(pacienteId: widget.paciente.id!, anamnese: anamnese)));
-    if (resultado != null) {
-      if (anamnese != null) {
-        await supabase.from('anamneses').update(resultado.toMap()).eq('id', anamnese.id!);
-      } else {
-        await supabase.from('anamneses').insert(resultado.toMap());
-      }
+    final bool? shouldRefresh = await Navigator.push<bool>(
+      context, 
+      MaterialPageRoute(
+        builder: (context) => AnamneseFormTela(
+          pacienteId: widget.paciente.id!, 
+          anamnese: anamnese,
+        )
+      )
+    );
+
+    if (shouldRefresh == true) {
       setState(() {});
     }
   }
@@ -111,6 +126,31 @@ class _PacienteDetalhesTelaState extends State<PacienteDetalhesTela> {
     final resultadoExistente = await _buscarResultadoParaSolicitacao(solicitacao.id);
     Navigator.push(context, MaterialPageRoute(builder: (context) => ExameResultadoFormTela(solicitacao: solicitacao, resultadoExistente: resultadoExistente)))
     .then((_) => setState(() {}));
+  }
+
+  Future<List<ExameCategoria>> _buscarExamesDisponiveis() async {
+    final data = await supabase.from('exame_categorias').select('*, exame_tipos(*)').order('nome');
+    return data.map((item) => ExameCategoria.fromMap(item)).toList();
+  }
+
+  Future<void> _salvarSolicitacao() async {
+    if (!_formKey.currentState!.validate()) return;
+    final idsSelecionadas = _selecionados.entries.where((e) => e.value).map((e) => e.key).toList();
+    if (idsSelecionadas.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Selecione ao menos um exame.'), backgroundColor: Colors.orange));
+      return;
+    }
+    setState(() => _isSaving = true);
+    try {
+      await supabase.from('exame_solicitacoes').insert({'paciente_id': widget.paciente.id!, 'justificativa_clinica': _justificativaController.text, 'exames_solicitados': idsSelecionadas});
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Solicitação salva com sucesso!'), backgroundColor: Colors.green));
+      _justificativaController.clear();
+      _selecionados.clear();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao salvar: $e'), backgroundColor: Colors.red));
+    } finally {
+      setState(() => _isSaving = false);
+    }
   }
 
   @override
@@ -260,7 +300,7 @@ class _PacienteDetalhesTelaState extends State<PacienteDetalhesTela> {
   Widget _buildCurrentTabContent() {
     switch (_selectedIndex) {
       case 0: return _buildAtendimentosTab();
-      case 1: return _buildEvolucaoChecklistTab();
+      case 1: return _buildSolicitarExamesTab();
       case 2: return _buildExamesTab();
       case 3: return _buildSolicitacoesTab();
       default: return const SizedBox.shrink();
@@ -283,7 +323,7 @@ class _PacienteDetalhesTelaState extends State<PacienteDetalhesTela> {
             itemCount: anamneses.length,
             itemBuilder: (context, index) {
               final anamnese = anamneses[index];
-              return Card(margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5), child: ListTile(leading: const Icon(Icons.description_outlined), title: Text(anamnese.queixaPrincipal, style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: Text('Data: ${DateFormat('dd/MM/yyyy').format(anamnese.data!)}'), trailing: IconButton(icon: Icon(Icons.edit_outlined, color: Theme.of(context).colorScheme.primary), onPressed: () => _abrirFormularioAnamnese(anamnese: anamnese))));
+              return Card(margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5), child: ListTile(leading: const Icon(Icons.description_outlined), title: Text(anamnese.queixaPrincipal, style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: Text('Data: ${DateFormat('dd/MM/yyyy').format(anamnese.data)}'), trailing: IconButton(icon: Icon(Icons.edit_outlined, color: Theme.of(context).colorScheme.primary), onPressed: () => _abrirFormularioAnamnese(anamnese: anamnese))));
             },
           );
         },
@@ -291,70 +331,71 @@ class _PacienteDetalhesTelaState extends State<PacienteDetalhesTela> {
     ]);
   }
 
-  Widget _buildEvolucaoChecklistTab() {
-    return StatefulBuilder(
-      builder: (BuildContext context, StateSetter setState) {
-        final formKey = GlobalKey<FormState>();
-        final justificativaController = TextEditingController();
-        final Map<int, bool> selecionados = {};
-        bool isSaving = false;
-        Future<List<ExameCategoria>> buscarExamesDisponiveis() async {
-          final data = await supabase.from('exame_categorias').select('*, exame_tipos(*)').order('nome');
-          return data.map((item) => ExameCategoria.fromMap(item)).toList();
+  Widget _buildSolicitarExamesTab() {
+    return FutureBuilder<List<ExameCategoria>>(
+      future: _buscarExamesDisponiveis(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
         }
-        Future<void> salvarSolicitacao() async {
-          if (!formKey.currentState!.validate()) return;
-          final idsSelecionadas = selecionados.entries.where((e) => e.value).map((e) => e.key).toList();
-          if (idsSelecionadas.isEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Selecione ao menos um exame.'), backgroundColor: Colors.orange));
-            return;
-          }
-          setState(() => isSaving = true);
-          try {
-            await supabase.from('exame_solicitacoes').insert({'paciente_id': widget.paciente.id!, 'justificativa_clinica': justificativaController.text, 'exames_solicitados': idsSelecionadas});
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Solicitação salva com sucesso!'), backgroundColor: Colors.green));
-            justificativaController.clear();
-            selecionados.clear();
-          } catch (e) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao salvar: $e'), backgroundColor: Colors.red));
-          } finally {
-            setState(() => isSaving = false);
-          }
+        if (snapshot.hasError) {
+          return Center(child: Text('Erro ao carregar exames: ${snapshot.error}'));
         }
-        return FutureBuilder<List<ExameCategoria>>(
-          future: buscarExamesDisponiveis(),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-            final categorias = snapshot.data!;
-            return Form(
-              key: formKey,
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                children: [
-                  ...categorias.map((categoria) => ExpansionTile(
+        final categorias = snapshot.data!;
+        return Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                child: Text('Solicitar Exames', style: Theme.of(context).textTheme.titleLarge),
+              ),
+              ...categorias.map((categoria) {
+                return Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  child: ExpansionTile(
                     title: Text(categoria.nome, style: const TextStyle(fontWeight: FontWeight.bold)),
                     initiallyExpanded: true,
-                    children: categoria.tipos.map((tipo) => CheckboxListTile(
-                      title: Text(tipo.nome),
-                      value: selecionados[tipo.id] ?? false,
-                      onChanged: (bool? value) => setState(() => selecionados[tipo.id] = value!),
-                    )).toList(),
-                  )),
-                  const SizedBox(height: 24),
-                  TextFormField(
-                    controller: justificativaController,
-                    decoration: const InputDecoration(labelText: 'Justificativa Clínica', border: OutlineInputBorder()),
-                    maxLines: 3,
-                    validator: (v) => v!.isEmpty ? 'Campo obrigatório' : null,
+                    children: categoria.tipos.map<Widget>((tipo) {
+                      return CheckboxListTile(
+                        title: Text(tipo.nome),
+                        value: _selecionados[tipo.id] ?? false,
+                        onChanged: (bool? value) {
+                          setState(() {
+                            _selecionados[tipo.id] = value!;
+                          });
+                        },
+                        controlAffinity: ListTileControlAffinity.leading,
+                      );
+                    }).toList(),
                   ),
-                  const SizedBox(height: 24),
-                  isSaving ? const Center(child: CircularProgressIndicator()) : ElevatedButton.icon(onPressed: salvarSolicitacao, icon: const Icon(Icons.send_outlined), label: const Text('Enviar Solicitação'))
-                ],
+                );
+              }),
+              const SizedBox(height: 24),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: TextFormField(
+                  controller: _justificativaController,
+                  decoration: const InputDecoration(labelText: 'Justificativa Clínica', border: OutlineInputBorder()),
+                  maxLines: 3,
+                  validator: (v) => v!.isEmpty ? 'Campo obrigatório' : null,
+                ),
               ),
-            );
-          },
+              const SizedBox(height: 24),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: _isSaving
+                    ? const Center(child: CircularProgressIndicator())
+                    : ElevatedButton.icon(
+                        onPressed: _salvarSolicitacao,
+                        icon: const Icon(Icons.send_outlined),
+                        label: const Text('Enviar Solicitação'),
+                      ),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
         );
       },
     );

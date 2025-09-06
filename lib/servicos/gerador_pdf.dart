@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:prontuario_medico/modelos/anamnese.dart'; // Adicionado para a nova seção
 import 'package:prontuario_medico/modelos/devolutiva.dart';
 import 'package:prontuario_medico/modelos/exame_resultado.dart';
 import 'package:prontuario_medico/modelos/exame_tipo.dart';
@@ -15,28 +16,25 @@ import 'package:http/http.dart' as http;
 
 final supabase = Supabase.instance.client;
 
-const PdfColor corAzulPdf = PdfColor.fromInt(0xFF1463DD);
+const PdfColor corAzulPdf = PdfColor.fromInt(0xFF133B4E);
 
 class GeradorPdf {
   static Future<void> gerarLaudoCompleto(BuildContext context, Paciente paciente) async {
     try {
       print('1. Iniciando geração do PDF...');
 
+      // --- Funções Auxiliares de Busca de Dados ---
+      final anamneses = await _buscarAnamneses(paciente.id!); // Busca as anamneses
       final resultado = await _buscarUltimoResultado(paciente.id!);
-      print('2. Resultado do exame encontrado: ${resultado != null}');
-      
       final tiposExamesComRef = await _buscarTiposExames();
-      print('3. Tipos de exames carregados: ${tiposExamesComRef.length} tipos.');
-      
       final devolutiva = await _buscarUltimaDevolutiva(paciente.id!);
-      print('4. Devolutiva encontrada: ${devolutiva != null}');
-      
-      if (resultado == null && devolutiva == null) {
+
+      if (resultado == null && devolutiva == null && anamneses.isEmpty) {
         print('ERRO: Nenhum dado para gerar o laudo.');
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Não há resultados ou devolutiva para gerar o laudo.'),
+              content: Text('Não há dados (anamnese, resultados ou devolutiva) para gerar o laudo.'),
               backgroundColor: Colors.orangeAccent,
             ),
           );
@@ -45,17 +43,13 @@ class GeradorPdf {
       }
 
       final pdf = pw.Document();
-      // **** MUDANÇA PRINCIPAL AQUI ****
-      // Carregando a imagem diretamente da internet.
-      // Substitua pela URL da sua imagem hospedada.
-      final imageUrl = 'https://qqhrskmuzbbhslgmdord.supabase.co/storage/v1/object/public/assets/logo.png'; // Exemplo de URL do ImgBB
+      final imageUrl = 'https://qqhrskmuzbbhslgmdord.supabase.co/storage/v1/object/public/assets/logo.png';
       final response = await http.get(Uri.parse(imageUrl));
       if (response.statusCode != 200) {
         throw Exception('Falha ao carregar a imagem da internet.');
       }
       final imageBytes = response.bodyBytes;
       final logoImage = pw.MemoryImage(imageBytes);
-      print('5. Logo carregado com sucesso da internet.');
       print('5. Logo carregado com sucesso da internet.');
 
       pdf.addPage(
@@ -68,12 +62,18 @@ class GeradorPdf {
             pw.SizedBox(height: 20),
             pw.Divider(thickness: 1.5),
             pw.SizedBox(height: 20),
-            
-            if (resultado != null)
+
+            if (anamneses.isNotEmpty) ...[
+              _buildSecaoAnamneses(anamneses),
+              pw.SizedBox(height: 20),
+            ],
+
+            if (resultado != null) ...[
               _buildTabelaResultados(resultado, tiposExamesComRef),
-            
+              pw.SizedBox(height: 20),
+            ],
+
             if (devolutiva != null) ...[
-              pw.SizedBox(height: 30),
               _buildSecaoDevolutiva(devolutiva),
             ],
           ],
@@ -100,6 +100,11 @@ class GeradorPdf {
   }
 
   // --- Funções Auxiliares de Busca de Dados ---
+
+  static Future<List<Anamnese>> _buscarAnamneses(int pacienteId) async {
+    final data = await supabase.from('anamneses').select().eq('paciente_id', pacienteId).order('created_at', ascending: false);
+    return data.map((item) => Anamnese.fromMap(item)).toList();
+  }
 
   static Future<ExameResultado?> _buscarUltimoResultado(int pacienteId) async {
     final solicitacaoData = await supabase.from('exame_solicitacoes').select('id').eq('paciente_id', pacienteId).order('created_at', ascending: false).limit(1);
@@ -153,68 +158,212 @@ class GeradorPdf {
       pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
         pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
           pw.Text('Data de Nascimento:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-          pw.Text(paciente.dataNascimento),
+          pw.Text(paciente.dataNascimento ?? 'N/A'),
         ]),
         pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
           pw.Text('Sexo:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-          pw.Text(paciente.sexo),
+          pw.Text(paciente.sexo ?? 'N/A'),
         ]),
-         pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+        pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
           pw.Text('Nº Prontuário:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-          pw.Text(paciente.numeroProntuario),
+          pw.Text(paciente.numeroProntuario ?? 'N/A'),
         ]),
       ]),
     ]);
   }
 
-  static pw.Widget _buildTabelaResultados(ExameResultado resultado, Map<String, ExameTipo> tiposExames) {
-    final headers = ['Exame Solicitado', 'Resultado', 'Valores de Referência'];
-    final data = resultado.resultados.entries.map((entry) {
+  static pw.Widget _buildSecaoAnamneses(List<Anamnese> anamneses) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        _buildTituloSecao('Anamneses'),
+        for (var anamnese in anamneses) _buildAnamneseCard(anamnese),
+      ],
+    );
+  }
+
+  static pw.Widget _buildAnamneseCard(Anamnese anamnese) {
+    return pw.Container(
+      margin: const pw.EdgeInsets.only(bottom: 12),
+      padding: const pw.EdgeInsets.all(12),
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: PdfColors.grey300, width: 1),
+        borderRadius: pw.BorderRadius.circular(8),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+              'Anamnese de ${DateFormat('dd/MM/yyyy').format(anamnese.data!)}',
+              style: pw.TextStyle(
+                  fontWeight: pw.FontWeight.bold,
+                  fontSize: 12,
+                  color: corAzulPdf)),
+          pw.Divider(height: 10, color: PdfColors.grey400),
+          if (anamnese.queixaPrincipal.isNotEmpty)
+            _buildDetalheAnamnese('Queixa Principal', anamnese.queixaPrincipal),
+          if (anamnese.historiaDoencaAtual.isNotEmpty)
+            _buildDetalheAnamnese(
+                'História da Doença Atual', anamnese.historiaDoencaAtual),
+          if (anamnese.historicoPatologicoPregresso.isNotEmpty)
+            _buildDetalheAnamnese('Histórico Patológico Pregresso',
+                anamnese.historicoPatologicoPregresso),
+          if (anamnese.usoMedicamentos.isNotEmpty)
+            _buildDetalheAnamnese(
+                'Uso de Medicamentos', anamnese.usoMedicamentos),
+          if (anamnese.habitosVida.isNotEmpty)
+            _buildDetalheAnamnese('Hábitos de Vida', anamnese.habitosVida),
+          if (anamnese.antecedentesFamiliares.isNotEmpty)
+            _buildDetalheAnamnese(
+                'Antecedentes Familiares', anamnese.antecedentesFamiliares),
+        ],
+      ),
+    );
+  }
+
+  static pw.Widget _buildDetalheAnamnese(String title, String content) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.only(bottom: 8),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text('$title:',
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+          pw.Text(content, textAlign: pw.TextAlign.justify),
+        ],
+      ),
+    );
+  }
+
+  static pw.Widget _buildSecaoResultados(
+      ExameResultado resultado, Map<String, ExameTipo> tiposExames) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        _buildTituloSecao('Resultados de Exames'),
+        _buildTabelaResultados(resultado, tiposExames),
+      ],
+    );
+  }
+
+  static pw.Widget _buildTabelaResultados(
+      ExameResultado resultado, Map<String, ExameTipo> tiposExames) {
+    final headers = [
+      'Exame Solicitado',
+      'Resultado',
+      'Valores de Ref. (H)',
+      'Valores de Ref. (M)'
+    ];
+    final data = resultado.resultados!.entries.map((entry) {
       final nomeExame = entry.key;
       final valorResultado = entry.value.toString();
-      final valorReferencia = tiposExames[nomeExame]?.valorReferencia ?? 'N/A';
-      return [nomeExame, valorResultado, valorReferencia];
+      final tipoExame = tiposExames[nomeExame];
+      return [
+        nomeExame,
+        valorResultado,
+        tipoExame?.valorReferenciaHomem ?? 'N/A',
+        tipoExame?.valorReferenciaMulher ?? 'N/A',
+      ];
     }).toList();
 
     return pw.Table.fromTextArray(
       headers: headers,
       data: data,
-      headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+      headerStyle:
+          pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
       cellStyle: const pw.TextStyle(fontSize: 10),
       headerDecoration: const pw.BoxDecoration(color: corAzulPdf),
       border: pw.TableBorder.all(color: PdfColors.grey, width: 0.5),
-      cellAlignments: {0: pw.Alignment.centerLeft, 1: pw.Alignment.center, 2: pw.Alignment.center},
+      cellAlignments: {
+        0: pw.Alignment.centerLeft,
+        1: pw.Alignment.center,
+        2: pw.Alignment.center,
+        3: pw.Alignment.center
+      },
     );
   }
-  
+
   static pw.Widget _buildSecaoDevolutiva(Devolutiva devolutiva) {
-    return pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-      _buildTextBlock('Relatório Acessível ao Paciente', devolutiva.relatorioPaciente),
-      _buildTextBlock('Interpretação Básica (Profissional)', devolutiva.interpretacaoBasica),
-      _buildTextBlock('Orientação e Encaminhamento', devolutiva.orientacaoEncaminhamento),
-      pw.SizedBox(height: 60),
-      pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceAround, children: [
-        _buildAssinatura('Assinatura Aluno(s):\n${devolutiva.assinaturaAluno}'),
-        _buildAssinatura('Assinatura Professor:\n${devolutiva.assinaturaProfessor}'),
-      ])
-    ]);
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        _buildTituloSecao('Devolutivas'),
+        _buildDevolutivaCard(devolutiva),
+      ],
+    );
+  }
+
+  static pw.Widget _buildDevolutivaCard(Devolutiva devolutiva) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        _buildTextBlock(
+            'Relatório Acessível ao Paciente', devolutiva.relatorioPaciente),
+        _buildTextBlock('Interpretação Básica (Profissional)',
+            devolutiva.interpretacaoBasica),
+        _buildTextBlock(
+            'Orientação e Encaminhamento', devolutiva.orientacaoEncaminhamento),
+        pw.SizedBox(height: 60),
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+          children: [
+            _buildAssinatura(
+                'Assinatura Aluno(s):\n${devolutiva.assinaturaAluno}'),
+            _buildAssinatura(
+                'Assinatura Professor:\n${devolutiva.assinaturaProfessor}'),
+          ],
+        ),
+      ],
+    );
   }
 
   static pw.Widget _buildTextBlock(String title, String content) {
     return pw.Padding(
       padding: const pw.EdgeInsets.only(bottom: 16),
-      child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-        pw.Text(title, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14, color: corAzulPdf)),
-        pw.Container(height: 1, color: PdfColors.grey, margin: const pw.EdgeInsets.symmetric(vertical: 4)),
-        pw.Text(content, textAlign: pw.TextAlign.justify),
-      ])
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(title,
+              style: pw.TextStyle(
+                  fontWeight: pw.FontWeight.bold,
+                  fontSize: 14,
+                  color: corAzulPdf)),
+          pw.Container(
+              height: 1,
+              color: PdfColors.grey,
+              margin: const pw.EdgeInsets.symmetric(vertical: 4)),
+          pw.Text(content, textAlign: pw.TextAlign.justify),
+        ],
+      ),
     );
   }
-  
+
   static pw.Widget _buildAssinatura(String text) {
-    return pw.SizedBox(width: 200, child: pw.Column(children: [
-      pw.Container(height: 0.5, color: PdfColors.black, margin: const pw.EdgeInsets.only(bottom: 4)),
-      pw.Text(text, textAlign: pw.TextAlign.center),
-    ]));
+    return pw.SizedBox(
+      width: 200,
+      child: pw.Column(
+        children: [
+          pw.Container(
+              height: 0.5,
+              color: PdfColors.black,
+              margin: const pw.EdgeInsets.only(bottom: 4)),
+          pw.Text(text, textAlign: pw.TextAlign.center),
+        ],
+      ),
+    );
+  }
+
+  static pw.Widget _buildTituloSecao(String title) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.only(bottom: 12),
+      child: pw.Text(
+        title,
+        style: pw.TextStyle(
+          fontWeight: pw.FontWeight.bold,
+          fontSize: 18,
+          color: corAzulPdf,
+        ),
+      ),
+    );
   }
 }

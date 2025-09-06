@@ -7,7 +7,8 @@ import 'package:prontuario_medico/modelos/exame_tipo.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 final supabase = Supabase.instance.client;
-const Color corPrimaria = Color(0xFF1463DD); // Usando a mesma cor do main.dart
+const Color corPrimaria = Color(0xFF133B4E); // Cor principal do tema
+const Color corSecundaria = Color(0xFFF0F2F5); // Cor de fundo suave
 
 class ExameResultadoFormTela extends StatefulWidget {
   final ExameSolicitacao solicitacao;
@@ -118,81 +119,120 @@ class _ExameResultadoFormTelaState extends State<ExameResultadoFormTela> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: corSecundaria,
       appBar: AppBar(
-        title: Text(widget.resultadoExistente == null
-            ? 'Inserir Resultados'
-            : 'Editar Resultados'),
+        backgroundColor: corPrimaria,
+        title: Text(
+          widget.resultadoExistente == null ? 'Inserir Resultados' : 'Editar Resultados',
+          style: const TextStyle(color: Colors.white),
+        ),
       ),
-      // **** BOTÃO "SALVAR" AGORA É UM FLOATINGACTIONBUTTON ****
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _salvarResultados,
         label: const Text('Salvar Alterações'),
         icon: const Icon(Icons.save),
+        backgroundColor: corPrimaria,
+        foregroundColor: Colors.white,
       ),
-      floatingActionButtonLocation:
-          FloatingActionButtonLocation.centerFloat, // Centraliza o botão
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Form(
-              key: _formKey,
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(
-                    16, 16, 16, 80), // Espaço extra para o FAB
-                children: [
-                  // **** MUDANÇA PRINCIPAL: DATATABLE COM ESTILO DO PDF ****
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: DataTable(
-                      headingRowColor: MaterialStateProperty.all(
-                          corPrimaria), // Cabeçalho azul
-                      headingTextStyle: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white), // Texto do cabeçalho branco
-                      border: TableBorder.all(
-                          color: Colors.grey.shade400, width: 1),
-                      columns: const [
-                        DataColumn(label: Text('Exame Solicitado')),
-                        DataColumn(label: Text('Resultado')),
-                        DataColumn(label: Text('Valores de Referência')),
-                      ],
-                      rows: _tiposDeExame.map((tipo) {
-                        return DataRow(
-                          cells: [
-                            DataCell(Text(tipo.nome)),
-                            DataCell(
-                              Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 4.0),
-                                child: TextFormField(
-                                  controller: _resultadoControllers[tipo.id],
-                                  decoration: const InputDecoration(
-                                      border: OutlineInputBorder(),
-                                      contentPadding:
-                                          EdgeInsets.symmetric(horizontal: 8)),
-                                  textAlign: TextAlign.center,
-                                  validator: (v) =>
-                                      v!.trim().isEmpty ? '*' : null,
-                                ),
-                              ),
-                            ),
-                            DataCell(Text(tipo.valorReferencia,
-                                textAlign: TextAlign.center)),
-                          ],
-                        );
-                      }).toList(),
-                    ),
+          : Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 900),
+                child: Form(
+                  key: _formKey,
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+                    children: [
+                      _buildTabelaResultados(),
+                      const SizedBox(height: 24),
+                      TextFormField(
+                        controller: _observacoesController,
+                        decoration: _buildInputDecoration(
+                          labelText: 'Observações Gerais',
+                          icon: Icons.notes,
+                        ),
+                        maxLines: 4,
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 24),
-                  TextFormField(
-                    controller: _observacoesController,
-                    decoration: const InputDecoration(
-                        labelText: 'Observações Gerais',
-                        border: OutlineInputBorder()),
-                    maxLines: 4,
-                  ),
-                ],
+                ),
               ),
             ),
+    );
+  }
+
+  Widget _buildTabelaResultados() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: DataTable(
+            columnSpacing: 24,
+            headingRowColor: MaterialStateProperty.all(corPrimaria.withOpacity(0.9)),
+            headingTextStyle: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+            dataRowColor: MaterialStateProperty.all(Colors.white),
+            border: TableBorder.all(
+              color: Colors.grey.shade300,
+              width: 1,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            columns: const [
+              DataColumn(label: Text('Exame Solicitado')),
+              DataColumn(label: Text('Resultado')),
+              DataColumn(label: Text('Valores de Ref. (H)')),
+              DataColumn(label: Text('Valores de Ref. (M)')),
+            ],
+            rows: _tiposDeExame.map((tipo) {
+              return DataRow(
+                cells: [
+                  DataCell(Text(tipo.nome, style: const TextStyle(fontWeight: FontWeight.w500))),
+                  DataCell(
+                    SizedBox(
+                      width: 100,
+                      child: _buildResultInput(tipo),
+                    ),
+                  ),
+                  // CORREÇÃO AQUI: Tratamento para null com 'N/A'
+                  DataCell(Text(tipo.valorReferenciaHomem ?? 'N/A', textAlign: TextAlign.center)),
+                  DataCell(Text(tipo.valorReferenciaMulher ?? 'N/A', textAlign: TextAlign.center)),
+                ],
+              );
+            }).toList(),
+          ),
+        ),
+      ),
+    );
+  }
+  Widget _buildResultInput(ExameTipo tipo) {
+    return TextFormField(
+      controller: _resultadoControllers[tipo.id],
+      decoration: _buildInputDecoration(),
+      textAlign: TextAlign.center,
+      validator: (v) => v!.trim().isEmpty ? '*' : null,
+    );
+  }
+
+  InputDecoration _buildInputDecoration({String? labelText, IconData? icon}) {
+    return InputDecoration(
+      labelText: labelText,
+      prefixIcon: icon != null ? Icon(icon, color: corPrimaria) : null,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide.none,
+      ),
+      filled: true,
+      fillColor: Colors.grey[100],
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
     );
   }
 }

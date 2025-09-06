@@ -18,7 +18,7 @@ jobs:
 
       - run: flutter pub get
 
-      - run: flutter build web --release --base-href="/prontuario_novo.git/"
+      - run: flutter build web --release --base-href="/prontuario_novo/"
 
       - uses: peaceiris/actions-gh-pages@v3
         with:

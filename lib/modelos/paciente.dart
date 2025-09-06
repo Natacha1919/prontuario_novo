@@ -29,18 +29,38 @@ class Paciente {
     required this.professorResponsavel,
   });
 
- factory Paciente.fromMap(Map<String, dynamic> map) {
+  // **** MÉTODO toMap() ADICIONADO ****
+  Map<String, dynamic> toMap() {
+    return {
+      // O ID não é enviado na criação, pois o Supabase o gera.
+      // Mas é bom tê-lo para atualizações.
+      if (id != null) 'id': id, 
+      // A data de abertura (created_at) também é gerada pelo Supabase.
+
+      'nomeCompleto': nomeCompleto,
+      'dataNascimento': dataNascimento,
+      'sexo': sexo,
+      'cpf': cpf,
+      'endereco': endereco,
+      'responsavel_nome': responsavelNome,
+      'responsavel_contato': responsavelContato,
+      'numero_prontuario': numeroProntuario,
+      'turma_academica': turmaAcademica,
+      'professor_responsavel': professorResponsavel,
+    };
+  }
+
+  factory Paciente.fromMap(Map<String, dynamic> map) {
     return Paciente(
       id: map['id'],
-      // Trata o caso de dataAbertura ser null
-      dataAbertura: map['created_at'] != null ? DateTime.parse(map['created_at']) : null, 
+      dataAbertura: map['created_at'] != null ? DateTime.parse(map['created_at']) : null,
       nomeCompleto: map['nomeCompleto'] ?? '',
       dataNascimento: map['dataNascimento'] ?? '',
       sexo: map['sexo'] ?? '',
       cpf: map['cpf'] ?? '',
-      endereco: map['endereco'] ?? '', // Garante que não seja null
+      endereco: map['endereco'] ?? '',
       responsavelNome: map['responsavel_nome'] ?? '',
-      responsavelContato: map['responsavel_contato'] ?? '', // Garante que não seja null
+      responsavelContato: map['responsavel_contato'] ?? '',
       numeroProntuario: map['numero_prontuario'] ?? '',
       turmaAcademica: map['turma_academica'] ?? '',
       professorResponsavel: map['professor_responsavel'] ?? '',
