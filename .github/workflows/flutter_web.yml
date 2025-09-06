@@ -3,24 +3,30 @@ name: Flutter Web Deploy
 on:
   push:
     branches:
-      - main  # ou 'master', dependendo da sua branch principal
+      - main # ou 'master', dependendo da sua branch principal
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
 
     steps:
       - uses: actions/checkout@v2
 
-      - uses: subosito/flutter-action@v1
+      - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.x'  # Use a versão do seu Flutter, ex: '3.16.0'
+          flutter-version: '3.x' # Use a versão do seu Flutter, ex: '3.16.0'
+          channel: 'stable'
 
       - run: flutter pub get
 
       - run: flutter build web --release --base-href="/prontuario_novo/"
 
-      - uses: peaceiris/actions-gh-pages@v3
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: build/web
+          artifact_path: 'build/web'
