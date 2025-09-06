@@ -8,6 +8,12 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    
+    # --- AQUI ESTÁ A CORREÇÃO ---
+    permissions:
+      contents: write
+      pages: write
+    # -----------------------------
 
     steps:
       - uses: actions/checkout@v2
