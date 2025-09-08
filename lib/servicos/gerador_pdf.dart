@@ -235,19 +235,11 @@ class GeradorPdf {
     );
   }
 
-  static pw.Widget _buildSecaoResultados(
+static pw.Widget _buildTabelaResultados(
       ExameResultado resultado, Map<String, ExameTipo> tiposExames) {
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        _buildTituloSecao('Resultados de Exames'),
-        _buildTabelaResultados(resultado, tiposExames),
-      ],
-    );
-  }
+    // Adicione esta linha para depuração
+    print('Dados para a tabela de resultados: ${resultado.resultados}');
 
-  static pw.Widget _buildTabelaResultados(
-      ExameResultado resultado, Map<String, ExameTipo> tiposExames) {
     final headers = [
       'Exame Solicitado',
       'Resultado',
@@ -263,23 +255,23 @@ class GeradorPdf {
         tipoExame?.valorReferencia ?? 'N/A',
       ];
     }).toList();
-
-    return pw.Table.fromTextArray(
-      headers: headers,
-      data: data,
-      headerStyle:
-          pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
-      cellStyle: const pw.TextStyle(fontSize: 10),
-      headerDecoration: const pw.BoxDecoration(color: corAzulPdf),
-      border: pw.TableBorder.all(color: PdfColors.grey, width: 0.5),
-      cellAlignments: {
-        0: pw.Alignment.centerLeft,
-        1: pw.Alignment.center,
-        2: pw.Alignment.center,
-        3: pw.Alignment.center
-      },
-    );
-  }
+    
+  return pw.Table.fromTextArray(
+    headers: headers,
+    data: data,
+    headerStyle:
+        pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+    cellStyle: const pw.TextStyle(fontSize: 10),
+    headerDecoration: const pw.BoxDecoration(color: corAzulPdf),
+    border: pw.TableBorder.all(color: PdfColors.grey, width: 0.5),
+    // ⚠️ CORREÇÃO: Remova o último alinhamento
+    cellAlignments: {
+      0: pw.Alignment.centerLeft,
+      1: pw.Alignment.center,
+      2: pw.Alignment.center,
+    },
+  );
+}
 
   static pw.Widget _buildSecaoDevolutiva(Devolutiva devolutiva) {
     return pw.Column(
