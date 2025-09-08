@@ -31147,7 +31147,7 @@ if(n.length!==0)o.push(new A.j8(B.fj,new A.kw(B.cL,B.e3,B.d6,B.bX,B.df,new A.jD(
 r=r.x
 if(r.length!==0)o.push(new A.j8(B.fj,new A.kw(B.cL,B.e3,B.d6,B.bX,B.df,new A.jD(),A.b([A.dh("Antecedentes Familiares:",A.hk(m,m,m,m,m,m,m,m,m,B.bF,m,m,m,m,B.bg,m,!0,m,m,m,m),m,m),A.dh(r,m,B.eM,m)],l))))
 k.push(A.p5(m,new A.kw(B.cL,B.e3,B.d6,B.bX,B.df,new A.jD(),o),m,m,new A.ws(m,new A.ry(q,q,q,q),new A.a9L(p,p,p,p)),m,B.v4,B.Uc))}return A.p4(k,B.bX)},
-b3N(a,b){var s,r=null,q=A.b(["Exame Solicitado","Resultado","Valores de Ref. (H)","Valores de Ref. (M)"],t.s),p=J.a8J(a.e),o=p.eF(p,new A.afH(b),t.yp).eV(0)
+b3N(a,b){var s,r=null,q=A.b(["Exame Solicitado","Resultado","Valores de Ref.","Valores de Ref. (H)","Valores de Ref. (M)"],t.s),p=J.a8J(a.e),o=p.eF(p,new A.afH(b),t.yp).eV(0)
 p=A.hk(r,B.aNI,r,r,r,r,r,r,r,B.bF,r,r,r,r,B.bg,r,!0,r,r,r,r)
 s=new A.mX(B.lX,0.5,B.hm)
 return A.b7O(new A.Xx(s,s,s,s,s,s),B.Oe,A.af([0,B.Oc,1,B.f_,2,B.f_,3,B.f_],t.S,t.xQ),r,r,0,B.Ur,B.aUS,r,r,o,B.PO,B.f_,r,r,1,B.Pc,r,r,r,p,q,r,r,r,B.MI)},
@@ -33628,7 +33628,7 @@ if(s===0)return B.ML
 else if(s<0)return B.aTO
 else return B.aTP},
 b7O(a,b,c,d,e,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5,b6,b7,b8,b9,c0){var s,r,q,p,o,n,m,l,k,j,i=null,h=A.b([],t.nk),g=t.n_,f=A.b([],g)
-for(s=0;s<4;++s){r=b6[s]
+for(s=0;s<5;++s){r=b6[s]
 q=c.h(0,f.length)
 if(q==null)q=a7
 p=A.dh(r,b5,i,i)
@@ -111280,10 +111280,12 @@ A.afJ.prototype={
 $1(a){return A.aQ8(a)},
 $S:189}
 A.afH.prototype={
-$1(a){var s=a.a,r=J.dC(a.b),q=J.j(this.a,s),p=q==null,o=p?null:q.d
-if(o==null)o="N/A"
-p=p?null:q.e
-return A.b([s,r,o,p==null?"N/A":p],t.s)},
+$1(a){var s,r=a.a,q=J.dC(a.b),p=J.j(this.a,r),o=p==null,n=o?null:p.f
+if(n==null)n="N/A"
+s=o?null:p.d
+if(s==null)s="N/A"
+o=o?null:p.e
+return A.b([r,q,n,s,o==null?"N/A":o],t.s)},
 $S:622}
 A.rs.prototype={
 au(){return new A.Jl(new A.c0(null,t.am))}}
