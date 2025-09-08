@@ -2,10 +2,12 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:prontuario_medico/modelos/atividades_recentes.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:prontuario_medico/modelos/paciente.dart';
 import 'package:prontuario_medico/telas/paciente_detalhes_tela.dart';
 import 'package:prontuario_medico/telas/paciente_form_tela.dart';
+import 'package:intl/intl.dart';
 
 final supabase = Supabase.instance.client;
 
@@ -253,6 +255,18 @@ Widget _buildPatientCard(Paciente paciente) {
         ),
       ),
     ),
+  );
+}
+
+// Crie uma função para exibir cada item da lista de atividades recentes
+Widget _buildAtividadeRecenteItem(AtividadeRecente atividade) {
+  // ⚠️ ATENÇÃO: Use o getter 'timestampLocal' para obter o horário correto
+  final dataFormatada = DateFormat('dd/MM/yyyy HH:mm').format(atividade.timestampLocal);
+
+  return ListTile(
+    leading: const Icon(Icons.person_add_alt_1_outlined),
+    title: Text(atividade.descricao),
+    subtitle: Text(dataFormatada),
   );
 }
 

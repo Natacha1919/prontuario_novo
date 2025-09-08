@@ -4,12 +4,19 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:prontuario_medico/telas/tela_principal.dart';
 import 'package:prontuario_medico/telas/login_tela.dart';
+import 'package:timezone/data/latest.dart' as tz; // Importe o pacote
+import 'package:timezone/timezone.dart' as tz;
 
 // Definição da cor primária do aplicativo
 const Color corPrimaria = Color(0xFF1463DD);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // ⚠️ ATENÇÃO: Adicione esta parte para inicializar o fuso horário
+  tz.initializeTimeZones();
+  final location = tz.getLocation('America/Sao_Paulo');
+  tz.setLocalLocation(location);
 
   // Inicializa o Supabase com sua URL e Chave Anon
   await Supabase.initialize(
