@@ -4,24 +4,24 @@ class ExameTipo {
   final int id;
   final String nome;
   final int categoriaId;
-  final String valorReferenciaHomem;
-  final String valorReferenciaMulher;
+  final String? valorReferenciaHomem;   // Adicione esta propriedade
+  final String? valorReferenciaMulher;  // Adicione esta propriedade
 
-  ExameTipo({
+  const ExameTipo({
     required this.id,
     required this.nome,
     required this.categoriaId,
-    required this.valorReferenciaHomem,
-    required this.valorReferenciaMulher,
+    this.valorReferenciaHomem,
+    this.valorReferenciaMulher,
   });
 
   factory ExameTipo.fromMap(Map<String, dynamic> map) {
     return ExameTipo(
-      id: map['id'] as int,
-      nome: map['nome'] as String? ?? '',
-      categoriaId: map['categoria_id'] as int,
-      valorReferenciaHomem: map['valor_referencia_homem'] as String? ?? 'N/A',
-      valorReferenciaMulher: map['valor_referencia_mulher'] as String? ?? 'N/A',
+      id: map['id'],
+      nome: map['nome'] ?? '',
+      categoriaId: map['categoria_id'] ?? 0,
+      valorReferenciaHomem: map['valor_referencia_masculino'] as String?, // Mapeie o campo do banco
+      valorReferenciaMulher: map['valor_referencia_feminino'] as String?, // Mapeie o campo do banco
     );
   }
 }
