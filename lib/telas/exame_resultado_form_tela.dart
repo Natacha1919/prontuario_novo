@@ -192,8 +192,6 @@ class _ExameResultadoFormTelaState extends State<ExameResultadoFormTela> {
               DataColumn(label: Text('Exame Solicitado')),
               DataColumn(label: Text('Resultado')),
               DataColumn(label: Text('Valores de Ref.')),
-              DataColumn(label: Text('Valores de Ref. (H)')),
-              DataColumn(label: Text('Valores de Ref. (M)')),
             ],
             rows: _tiposDeExame.map((tipo) {
               return DataRow(
@@ -207,8 +205,6 @@ class _ExameResultadoFormTelaState extends State<ExameResultadoFormTela> {
                   ),
                   // CORREÇÃO AQUI: Tratamento para null com 'N/A'
                   DataCell(Text(tipo.valorReferencia ?? 'N/A', textAlign: TextAlign.center)),
-                  DataCell(Text(tipo.valorReferenciaHomem ?? 'N/A', textAlign: TextAlign.center)),
-                  DataCell(Text(tipo.valorReferenciaMulher ?? 'N/A', textAlign: TextAlign.center)),
                 ],
               );
             }).toList(),

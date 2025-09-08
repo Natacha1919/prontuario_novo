@@ -252,8 +252,6 @@ class GeradorPdf {
       'Exame Solicitado',
       'Resultado',
       'Valores de Ref.',
-      'Valores de Ref. (H)',
-      'Valores de Ref. (M)'
     ];
     final data = resultado.resultados!.entries.map((entry) {
       final nomeExame = entry.key;
@@ -263,8 +261,6 @@ class GeradorPdf {
         nomeExame,
         valorResultado,
         tipoExame?.valorReferencia ?? 'N/A',
-        tipoExame?.valorReferenciaHomem ?? 'N/A',
-        tipoExame?.valorReferenciaMulher ?? 'N/A',
       ];
     }).toList();
 
