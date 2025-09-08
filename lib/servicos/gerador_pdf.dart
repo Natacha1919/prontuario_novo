@@ -5,9 +5,10 @@ import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'package:prontuario_medico/modelos/anamnese.dart'; // Adicionado para a nova seção
+import 'package:prontuario_medico/modelos/anamnese.dart';
 import 'package:prontuario_medico/modelos/devolutiva.dart';
 import 'package:prontuario_medico/modelos/exame_resultado.dart';
+import 'package:prontuario_medico/modelos/exame_solicitacao.dart';
 import 'package:prontuario_medico/modelos/exame_tipo.dart';
 import 'package:prontuario_medico/modelos/paciente.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -23,13 +24,12 @@ class GeradorPdf {
     try {
       print('1. Iniciando geração do PDF...');
 
-      // --- Funções Auxiliares de Busca de Dados ---
-      final anamneses = await _buscarAnamneses(paciente.id!); // Busca as anamneses
-      final resultado = await _buscarUltimoResultado(paciente.id!);
+      final anamneses = await _buscarAnamneses(paciente.id!);
+      final resultados = await _buscarResultados(paciente.id!); 
       final tiposExamesComRef = await _buscarTiposExames();
       final devolutiva = await _buscarUltimaDevolutiva(paciente.id!);
-
-      if (resultado == null && devolutiva == null && anamneses.isEmpty) {
+      
+      if (resultados.isEmpty && devolutiva == null && anamneses.isEmpty) {
         print('ERRO: Nenhum dado para gerar o laudo.');
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -51,32 +51,42 @@ class GeradorPdf {
       final imageBytes = response.bodyBytes;
       final logoImage = pw.MemoryImage(imageBytes);
       print('5. Logo carregado com sucesso da internet.');
+      
+      final List<pw.Widget> tabelasResultados = [];
+      if (resultados.isNotEmpty) {
+        for (var resultado in resultados) {
+          tabelasResultados.add(await _buildTabelaResultados(resultado, tiposExamesComRef));
+          tabelasResultados.add(pw.SizedBox(height: 20)); 
+        }
+      }
 
       pdf.addPage(
         pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
           header: (context) => _buildHeader(logoImage),
           footer: (context) => _buildFooter(context),
-          build: (context) => [
-            _buildInfoPaciente(paciente),
-            pw.SizedBox(height: 20),
-            pw.Divider(thickness: 1.5),
-            pw.SizedBox(height: 20),
-
-            if (anamneses.isNotEmpty) ...[
-              _buildSecaoAnamneses(anamneses),
+          build: (context) {
+            final List<pw.Widget> pageContent = [
+              _buildInfoPaciente(paciente),
               pw.SizedBox(height: 20),
-            ],
-
-            if (resultado != null) ...[
-              _buildTabelaResultados(resultado, tiposExamesComRef),
+              pw.Divider(thickness: 1.5),
               pw.SizedBox(height: 20),
-            ],
+            ];
 
-            if (devolutiva != null) ...[
-              _buildSecaoDevolutiva(devolutiva),
-            ],
-          ],
+            // REMOÇÃO: A seção de anamneses foi removida daqui
+
+            if (tabelasResultados.isNotEmpty) {
+              pageContent.addAll(tabelasResultados);
+            }
+
+            if (devolutiva != null) {
+              pageContent.addAll([
+                _buildSecaoDevolutiva(devolutiva),
+              ]);
+            }
+
+            return pageContent;
+          },
         ),
       );
       print('6. Página do PDF construída.');
@@ -85,7 +95,6 @@ class GeradorPdf {
         onLayout: (PdfPageFormat format) async => pdf.save(),
       );
       print('7. PDF enviado para a tela de impressão/preview.');
-
     } catch (e) {
       print('ERRO AO GERAR PDF: $e');
       if (context.mounted) {
@@ -100,18 +109,25 @@ class GeradorPdf {
   }
 
   // --- Funções Auxiliares de Busca de Dados ---
-
+  
   static Future<List<Anamnese>> _buscarAnamneses(int pacienteId) async {
     final data = await supabase.from('anamneses').select().eq('paciente_id', pacienteId).order('created_at', ascending: false);
     return data.map((item) => Anamnese.fromMap(item)).toList();
   }
 
-  static Future<ExameResultado?> _buscarUltimoResultado(int pacienteId) async {
-    final solicitacaoData = await supabase.from('exame_solicitacoes').select('id').eq('paciente_id', pacienteId).order('created_at', ascending: false).limit(1);
-    if (solicitacaoData.isEmpty) return null;
-    final ultimaSolicitacaoId = solicitacaoData.first['id'];
-    final resultadoData = await supabase.from('exame_resultados').select().eq('solicitacao_id', ultimaSolicitacaoId).limit(1);
-    return resultadoData.isNotEmpty ? ExameResultado.fromMap(resultadoData.first) : null;
+  static Future<List<ExameResultado>> _buscarResultados(int pacienteId) async {
+    final solicitacoesData = await supabase.from('exame_solicitacoes').select('id, created_at').eq('paciente_id', pacienteId).order('created_at', ascending: false);
+    if (solicitacoesData.isEmpty) return [];
+    
+    final solicitacaoIds = solicitacoesData.map((e) => e['id'] as int).toList();
+    final resultadosData = await supabase.from('exame_resultados').select().inFilter('solicitacao_id', solicitacaoIds);
+    
+    final List<ExameResultado> resultados = [];
+    for (var item in resultadosData) {
+      final resultado = ExameResultado.fromMap(item);
+      resultados.add(resultado);
+    }
+    return resultados;
   }
   
   static Future<Devolutiva?> _buscarUltimaDevolutiva(int pacienteId) async {
@@ -234,18 +250,22 @@ class GeradorPdf {
       ),
     );
   }
-
-static pw.Widget _buildTabelaResultados(
-      ExameResultado resultado, Map<String, ExameTipo> tiposExames) {
-    // Adicione esta linha para depuração
-    print('Dados para a tabela de resultados: ${resultado.resultados}');
-
+  
+  static Future<pw.Widget> _buildTabelaResultados(
+      ExameResultado resultado, Map<String, ExameTipo> tiposExames) async {
+    final solicitacao = await supabase
+        .from('exame_solicitacoes')
+        .select('created_at')
+        .eq('id', resultado.solicitacaoId)
+        .single();
+    final dataSolicitacao = DateFormat('dd/MM/yyyy').format(DateTime.parse(solicitacao['created_at']));
+    
     final headers = [
       'Exame Solicitado',
       'Resultado',
       'Valores de Ref.',
     ];
-    final data = resultado.resultados!.entries.map((entry) {
+    final data = resultado.resultados.entries.map((entry) {
       final nomeExame = entry.key;
       final valorResultado = entry.value.toString();
       final tipoExame = tiposExames[nomeExame];
@@ -255,23 +275,29 @@ static pw.Widget _buildTabelaResultados(
         tipoExame?.valorReferencia ?? 'N/A',
       ];
     }).toList();
-    
-  return pw.Table.fromTextArray(
-    headers: headers,
-    data: data,
-    headerStyle:
-        pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
-    cellStyle: const pw.TextStyle(fontSize: 10),
-    headerDecoration: const pw.BoxDecoration(color: corAzulPdf),
-    border: pw.TableBorder.all(color: PdfColors.grey, width: 0.5),
-    // ⚠️ CORREÇÃO: Remova o último alinhamento
-    cellAlignments: {
-      0: pw.Alignment.centerLeft,
-      1: pw.Alignment.center,
-      2: pw.Alignment.center,
-    },
-  );
-}
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        _buildTituloSecao('Resultados do Exame - ${dataSolicitacao}'),
+        pw.SizedBox(height: 10),
+        pw.Table.fromTextArray(
+          headers: headers,
+          data: data,
+          headerStyle:
+              pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+          cellStyle: const pw.TextStyle(fontSize: 10),
+          headerDecoration: const pw.BoxDecoration(color: corAzulPdf),
+          border: pw.TableBorder.all(color: PdfColors.grey, width: 0.5),
+          cellAlignments: {
+            0: pw.Alignment.centerLeft,
+            1: pw.Alignment.center,
+            2: pw.Alignment.center,
+          },
+        ),
+      ],
+    );
+  }
 
   static pw.Widget _buildSecaoDevolutiva(Devolutiva devolutiva) {
     return pw.Column(

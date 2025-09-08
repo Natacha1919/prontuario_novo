@@ -47,17 +47,48 @@ class _ExameResultadoFormTelaState extends State<ExameResultadoFormTela> {
         return;
       }
 
-      final data =
-          await supabase.from('exame_tipos').select().inFilter('id', ids);
+      // 1. Busque os tipos de exame principais (os solicitados)
+      final dataPrincipais = await supabase
+          .from('exame_tipos')
+          .select()
+          .inFilter('id', ids);
+
+      // 2. Busque todos os subexames que têm um parent_id correspondente a um dos exames solicitados
+      final dataSubExames = await supabase
+          .from('exame_tipos')
+          .select()
+          .inFilter('parent_id', ids);
+
+      // 3. Combine as duas listas
+      final List<Map<String, dynamic>> dataCombinada = [
+        ...dataPrincipais,
+        ...dataSubExames,
+      ];
+      
+      // Crie um Set para garantir que não haja duplicatas
+      final uniqueItems = <Map<String, dynamic>>{};
+      for (var item in dataCombinada) {
+        uniqueItems.add(item);
+      }
+      
       final List<ExameTipo> tipos = [];
-      for (final item in data) {
-        final tipo = ExameTipo.fromMap(item as Map<String, dynamic>);
+      for (final item in uniqueItems) {
+        final tipo = ExameTipo.fromMap(item);
         tipos.add(tipo);
+
         final valorExistente =
-            widget.resultadoExistente?.resultados[tipo.nome] ?? '';
+            widget.resultadoExistente?.resultados?[tipo.nome] ?? '';
         _resultadoControllers[tipo.id] =
             TextEditingController(text: valorExistente.toString());
       }
+      
+      // 4. Ordene os exames para que o "pai" venha antes dos "filhos"
+      tipos.sort((a, b) {
+        if (a.parentId == null && b.parentId != null) return -1;
+        if (a.parentId != null && b.parentId == null) return 1;
+        return a.nome.compareTo(b.nome);
+      });
+      
       setState(() {
         _tiposDeExame = tipos;
         _isLoading = false;
@@ -186,8 +217,6 @@ class _ExameResultadoFormTelaState extends State<ExameResultadoFormTela> {
               width: 1,
               borderRadius: BorderRadius.circular(12),
             ),
-
-            // Removido: DataTable não suporta columnWidths
             columns: const [
               DataColumn(label: Text('Exame Solicitado')),
               DataColumn(label: Text('Resultado')),
@@ -203,7 +232,6 @@ class _ExameResultadoFormTelaState extends State<ExameResultadoFormTela> {
                       child: _buildResultInput(tipo),
                     ),
                   ),
-                  // CORREÇÃO AQUI: Tratamento para null com 'N/A'
                   DataCell(Text(tipo.valorReferencia ?? 'N/A', textAlign: TextAlign.center)),
                 ],
               );
@@ -213,6 +241,7 @@ class _ExameResultadoFormTelaState extends State<ExameResultadoFormTela> {
       ),
     );
   }
+  
   Widget _buildResultInput(ExameTipo tipo) {
     return TextFormField(
       controller: _resultadoControllers[tipo.id],
