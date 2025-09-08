@@ -251,6 +251,7 @@ class GeradorPdf {
     final headers = [
       'Exame Solicitado',
       'Resultado',
+      'Valores de Ref.',
       'Valores de Ref. (H)',
       'Valores de Ref. (M)'
     ];
@@ -261,6 +262,7 @@ class GeradorPdf {
       return [
         nomeExame,
         valorResultado,
+        tipoExame?.valorReferencia ?? 'N/A',
         tipoExame?.valorReferenciaHomem ?? 'N/A',
         tipoExame?.valorReferenciaMulher ?? 'N/A',
       ];
