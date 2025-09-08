@@ -296,7 +296,7 @@ class _DashboardViewState extends State<DashboardView> {
                       title: Text(description,
                           style: const TextStyle(fontWeight: FontWeight.bold)),
                       subtitle: Text(
-                          DateFormat('dd/MM/yyyy HH:mm').format(activity.data)),
+                          DateFormat('dd/MM/yyyy HH:mm').format(activity.timestampLocal)),
                       onTap: () {},
                     );
                   },
